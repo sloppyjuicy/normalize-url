@@ -8,11 +8,9 @@ Useful when you need to display, store, deduplicate, sort, compare, etc, URLs.
 
 ## Install
 
+```sh
+npm install normalize-url
 ```
-$ npm install normalize-url
-```
-
-*If you need to use this in the browser, use version 4: `npm i normalize-url@4`*
 
 ## Usage
 
@@ -30,6 +28,10 @@ normalizeUrl('//www.sindresorhus.com:80/../baz?b=bar&a=foo');
 
 ### normalizeUrl(url, options?)
 
+URLs with custom protocols are not normalized and just passed through by default. Supported protocols are: `https`, `http`, `file`, and `data`.
+
+Human-friendly URLs with basic auth (for example, `user:password@sindresorhus.com`) are not handled because basic auth conflicts with custom protocols. [Basic auth URLs are also deprecated.](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#access_using_credentials_in_the_url)
+
 #### url
 
 Type: `string`
@@ -43,7 +45,8 @@ Type: `object`
 ##### defaultProtocol
 
 Type: `string`\
-Default: `http:`
+Default: `'http'`\
+Values: `'https' | 'http'`
 
 ##### normalizeProtocol
 
@@ -53,10 +56,10 @@ Default: `true`
 Prepend `defaultProtocol` to the URL if it's protocol-relative.
 
 ```js
-normalizeUrl('//sindresorhus.com:80/');
+normalizeUrl('//sindresorhus.com');
 //=> 'http://sindresorhus.com'
 
-normalizeUrl('//sindresorhus.com:80/', {normalizeProtocol: false});
+normalizeUrl('//sindresorhus.com', {normalizeProtocol: false});
 //=> '//sindresorhus.com'
 ```
 
@@ -65,13 +68,13 @@ normalizeUrl('//sindresorhus.com:80/', {normalizeProtocol: false});
 Type: `boolean`\
 Default: `false`
 
-Normalize `https:` to `http:`.
+Normalize HTTPS to HTTP.
 
 ```js
-normalizeUrl('https://sindresorhus.com:80/');
+normalizeUrl('https://sindresorhus.com');
 //=> 'https://sindresorhus.com'
 
-normalizeUrl('https://sindresorhus.com:80/', {forceHttp: true});
+normalizeUrl('https://sindresorhus.com', {forceHttp: true});
 //=> 'http://sindresorhus.com'
 ```
 
@@ -80,17 +83,17 @@ normalizeUrl('https://sindresorhus.com:80/', {forceHttp: true});
 Type: `boolean`\
 Default: `false`
 
-Normalize `http:` to `https:`.
+Normalize HTTP to HTTPS.
 
 ```js
-normalizeUrl('https://sindresorhus.com:80/');
-//=> 'https://sindresorhus.com'
+normalizeUrl('http://sindresorhus.com');
+//=> 'http://sindresorhus.com'
 
-normalizeUrl('http://sindresorhus.com:80/', {forceHttps: true});
+normalizeUrl('http://sindresorhus.com', {forceHttps: true});
 //=> 'https://sindresorhus.com'
 ```
 
-This option can't be used with the `forceHttp` option at the same time.
+This option cannot be used with the `forceHttp` option at the same time.
 
 ##### stripAuthentication
 
@@ -100,10 +103,10 @@ Default: `true`
 Strip the [authentication](https://en.wikipedia.org/wiki/Basic_access_authentication) part of the URL.
 
 ```js
-normalizeUrl('user:password@sindresorhus.com');
+normalizeUrl('https://user:password@sindresorhus.com');
 //=> 'https://sindresorhus.com'
 
-normalizeUrl('user:password@sindresorhus.com', {stripAuthentication: false});
+normalizeUrl('https://user:password@sindresorhus.com', {stripAuthentication: false});
 //=> 'https://user:password@sindresorhus.com'
 ```
 
@@ -127,7 +130,9 @@ normalizeUrl('sindresorhus.com/about.html#contact', {stripHash: true});
 Type: `boolean`\
 Default: `false`
 
-Remove HTTP(S) protocol from the URL: `http://sindresorhus.com` → `sindresorhus.com`.
+Remove the protocol from the URL: `http://sindresorhus.com` → `sindresorhus.com`.
+
+It will only remove `https://` and `http://` protocols.
 
 ```js
 normalizeUrl('https://sindresorhus.com');
@@ -207,6 +212,22 @@ normalizeUrl('www.sindresorhus.com?foo=bar&utm_medium=test&ref=test_ref', {
 //=> 'http://www.sindresorhus.com/?foo=bar&ref=test_ref&utm_medium=test'
 ```
 
+##### keepQueryParameters
+
+Type: `Array<RegExp | string>`\
+Default: `undefined`
+
+Keeps only query parameters that matches any of the provided strings or regexes.
+
+**Note:** It overrides the `removeQueryParameters` option.
+
+```js
+normalizeUrl('https://sindresorhus.com?foo=bar&ref=unicorn', {
+	keepQueryParameters: ['ref']
+});
+//=> 'https://sindresorhus.com/?ref=unicorn'
+```
+
 ##### removeTrailingSlash
 
 Type: `boolean`\
@@ -232,7 +253,7 @@ normalizeUrl('http://sindresorhus.com/', {removeTrailingSlash: false});
 Type: `boolean`\
 Default: `true`
 
-Remove a sole `/` pathname in the output. This option is independant of `removeTrailingSlash`.
+Remove a sole `/` pathname in the output. This option is independent of `removeTrailingSlash`.
 
 ```js
 normalizeUrl('https://sindresorhus.com/');
@@ -256,6 +277,22 @@ normalizeUrl('www.sindresorhus.com/foo/default.php', {
 //=> 'http://sindresorhus.com/foo'
 ```
 
+##### removeExplicitPort
+
+Type: `boolean`\
+Default: `false`
+
+Removes an explicit port number from the URL.
+
+Port 443 is always removed from HTTPS URLs and 80 is always removed from HTTP URLs regardless of this option.
+
+```js
+normalizeUrl('sindresorhus.com:123', {
+	removeExplicitPort: true
+});
+//=> 'http://sindresorhus.com'
+```
+
 ##### sortQueryParameters
 
 Type: `boolean`\
@@ -273,15 +310,3 @@ normalizeUrl('www.sindresorhus.com?b=two&a=one&c=three', {
 ## Related
 
 - [compare-urls](https://github.com/sindresorhus/compare-urls) - Compare URLs by first normalizing them
-
----
-
-<div align="center">
-	<b>
-		<a href="https://tidelift.com/subscription/pkg/npm-normalize-url?utm_source=npm-normalize-url&utm_medium=referral&utm_campaign=readme">Get professional support for this package with a Tidelift subscription</a>
-	</b>
-	<br>
-	<sub>
-		Tidelift helps make open source sustainable for maintainers while giving companies<br>assurances about security, maintenance, and licensing for their dependencies.
-	</sub>
-</div>

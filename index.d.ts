@@ -1,8 +1,8 @@
-export interface Options {
+export type Options = {
 	/**
-	@default 'http:'
+	@default 'http'
 	*/
-	readonly defaultProtocol?: string;
+	readonly defaultProtocol?: 'https' | 'http';
 
 	/**
 	Prepends `defaultProtocol` to the URL if it's protocol-relative.
@@ -11,44 +11,44 @@ export interface Options {
 
 	@example
 	```
-	normalizeUrl('//sindresorhus.com:80/');
+	normalizeUrl('//sindresorhus.com');
 	//=> 'http://sindresorhus.com'
 
-	normalizeUrl('//sindresorhus.com:80/', {normalizeProtocol: false});
+	normalizeUrl('//sindresorhus.com', {normalizeProtocol: false});
 	//=> '//sindresorhus.com'
 	```
 	*/
 	readonly normalizeProtocol?: boolean;
 
 	/**
-	Normalizes `https:` URLs to `http:`.
+	Normalizes HTTPS URLs to HTTP.
 
 	@default false
 
 	@example
 	```
-	normalizeUrl('https://sindresorhus.com:80/');
+	normalizeUrl('https://sindresorhus.com');
 	//=> 'https://sindresorhus.com'
 
-	normalizeUrl('https://sindresorhus.com:80/', {forceHttp: true});
+	normalizeUrl('https://sindresorhus.com', {forceHttp: true});
 	//=> 'http://sindresorhus.com'
 	```
 	*/
 	readonly forceHttp?: boolean;
 
 	/**
-	Normalizes `http:` URLs to `https:`.
+	Normalizes HTTP URLs to HTTPS.
 
-	This option can't be used with the `forceHttp` option at the same time.
+	This option cannot be used with the `forceHttp` option at the same time.
 
 	@default false
 
 	@example
 	```
-	normalizeUrl('https://sindresorhus.com:80/');
-	//=> 'https://sindresorhus.com'
+	normalizeUrl('http://sindresorhus.com');
+	//=> 'http://sindresorhus.com'
 
-	normalizeUrl('http://sindresorhus.com:80/', {forceHttps: true});
+	normalizeUrl('http://sindresorhus.com', {forceHttps: true});
 	//=> 'https://sindresorhus.com'
 	```
 	*/
@@ -61,10 +61,10 @@ export interface Options {
 
 	@example
 	```
-	normalizeUrl('user:password@sindresorhus.com');
+	normalizeUrl('https://user:password@sindresorhus.com');
 	//=> 'https://sindresorhus.com'
 
-	normalizeUrl('user:password@sindresorhus.com', {stripAuthentication: false});
+	normalizeUrl('https://user:password@sindresorhus.com', {stripAuthentication: false});
 	//=> 'https://user:password@sindresorhus.com'
 	```
 	*/
@@ -87,7 +87,9 @@ export interface Options {
 	readonly stripHash?: boolean;
 
 	/**
-	Removes HTTP(S) protocol from an URL `http://sindresorhus.com` → `sindresorhus.com`.
+	Remove the protocol from the URL: `http://sindresorhus.com` → `sindresorhus.com`.
+
+	It will only remove `https://` and `http://` protocols.
 
 	@default false
 
@@ -176,6 +178,23 @@ export interface Options {
 	readonly removeQueryParameters?: ReadonlyArray<RegExp | string> | boolean;
 
 	/**
+	Keeps only query parameters that matches any of the provided strings or regexes.
+
+	__Note__: It overrides the `removeQueryParameters` option.
+
+	@default undefined
+
+	@example
+	```
+	normalizeUrl('https://sindresorhus.com?foo=bar&ref=unicorn', {
+		keepQueryParameters: ['ref']
+	});
+	//=> 'https://sindresorhus.com/?ref=unicorn'
+	```
+	*/
+	readonly keepQueryParameters?: ReadonlyArray<RegExp | string>;
+
+	/**
 	Removes trailing slash.
 
 	__Note__: Trailing slash is always removed if the URL doesn't have a pathname unless the `removeSingleSlash` option is set to `false`.
@@ -197,7 +216,7 @@ export interface Options {
 	readonly removeTrailingSlash?: boolean;
 
 	/**
-	Remove a sole `/` pathname in the output. This option is independant of `removeTrailingSlash`.
+	Remove a sole `/` pathname in the output. This option is independent of `removeTrailingSlash`.
 
 	@default true
 
@@ -229,6 +248,23 @@ export interface Options {
 	readonly removeDirectoryIndex?: boolean | ReadonlyArray<RegExp | string>;
 
 	/**
+	Removes an explicit port number from the URL.
+
+	Port 443 is always removed from HTTPS URLs and 80 is always removed from HTTP URLs regardless of this option.
+
+	@default false
+
+	@example
+	```
+	normalizeUrl('sindresorhus.com:123', {
+		removeExplicitPort: true
+	});
+	//=> 'http://sindresorhus.com'
+	```
+	*/
+	readonly removeExplicitPort?: boolean;
+
+	/**
 	Sorts the query parameters alphabetically by key.
 
 	@default true
@@ -242,10 +278,14 @@ export interface Options {
 	```
 	*/
 	readonly sortQueryParameters?: boolean;
-}
+};
 
 /**
 [Normalize](https://en.wikipedia.org/wiki/URL_normalization) a URL.
+
+URLs with custom protocols are not normalized and just passed through by default. Supported protocols are: `https`, `http`, `file`, and `data`.
+
+Human-friendly URLs with basic auth (for example, `user:password@sindresorhus.com`) are not handled because basic auth conflicts with custom protocols. [Basic auth URLs are also deprecated.](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication#access_using_credentials_in_the_url)
 
 @param url - URL to normalize, including [data URL](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URIs).
 

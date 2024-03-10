@@ -4,6 +4,24 @@ const DATA_URL_DEFAULT_CHARSET = 'us-ascii';
 
 const testParameter = (name, filters) => filters.some(filter => filter instanceof RegExp ? filter.test(name) : filter === name);
 
+const supportedProtocols = new Set([
+	'https:',
+	'http:',
+	'file:',
+]);
+
+const hasCustomProtocol = urlString => {
+	try {
+		const {protocol} = new URL(urlString);
+
+		return protocol.endsWith(':')
+			&& !protocol.includes('.')
+			&& !supportedProtocols.has(protocol);
+	} catch {
+		return false;
+	}
+};
+
 const normalizeDataURL = (urlString, {stripHash}) => {
 	const match = /^data:(?<type>[^,]*?),(?<data>[^#]*?)(?:#(?<hash>.*))?$/.exec(urlString);
 
@@ -22,7 +40,7 @@ const normalizeDataURL = (urlString, {stripHash}) => {
 	}
 
 	// Lowercase MIME type
-	const mimeType = (mediaType.shift() || '').toLowerCase();
+	const mimeType = mediaType.shift()?.toLowerCase() ?? '';
 	const attributes = mediaType
 		.map(attribute => {
 			let [key, value = ''] = attribute.split('=').map(string => string.trim());
@@ -57,7 +75,7 @@ const normalizeDataURL = (urlString, {stripHash}) => {
 
 export default function normalizeUrl(urlString, options) {
 	options = {
-		defaultProtocol: 'http:',
+		defaultProtocol: 'http',
 		normalizeProtocol: true,
 		forceHttp: false,
 		forceHttps: false,
@@ -69,9 +87,15 @@ export default function normalizeUrl(urlString, options) {
 		removeTrailingSlash: true,
 		removeSingleSlash: true,
 		removeDirectoryIndex: false,
+		removeExplicitPort: false,
 		sortQueryParameters: true,
 		...options,
 	};
+
+	// Legacy: Append `:` to the protocol if missing.
+	if (typeof options.defaultProtocol === 'string' && !options.defaultProtocol.endsWith(':')) {
+		options.defaultProtocol = `${options.defaultProtocol}:`;
+	}
 
 	urlString = urlString.trim();
 
@@ -80,8 +104,8 @@ export default function normalizeUrl(urlString, options) {
 		return normalizeDataURL(urlString, options);
 	}
 
-	if (/^view-source:/i.test(urlString)) {
-		throw new Error('`view-source:` is not supported as it is a non-standard protocol');
+	if (hasCustomProtocol(urlString)) {
+		return urlString;
 	}
 
 	const hasRelativeProtocol = urlString.startsWith('//');
@@ -192,6 +216,7 @@ export default function normalizeUrl(urlString, options) {
 
 	// Remove query unwanted parameters
 	if (Array.isArray(options.removeQueryParameters)) {
+		// eslint-disable-next-line unicorn/no-useless-spread -- We are intentionally spreading to get a copy.
 		for (const key of [...urlObject.searchParams.keys()]) {
 			if (testParameter(key, options.removeQueryParameters)) {
 				urlObject.searchParams.delete(key);
@@ -199,17 +224,37 @@ export default function normalizeUrl(urlString, options) {
 		}
 	}
 
-	if (options.removeQueryParameters === true) {
+	if (!Array.isArray(options.keepQueryParameters) && options.removeQueryParameters === true) {
 		urlObject.search = '';
+	}
+
+	// Keep wanted query parameters
+	if (Array.isArray(options.keepQueryParameters) && options.keepQueryParameters.length > 0) {
+		// eslint-disable-next-line unicorn/no-useless-spread -- We are intentionally spreading to get a copy.
+		for (const key of [...urlObject.searchParams.keys()]) {
+			if (!testParameter(key, options.keepQueryParameters)) {
+				urlObject.searchParams.delete(key);
+			}
+		}
 	}
 
 	// Sort query parameters
 	if (options.sortQueryParameters) {
 		urlObject.searchParams.sort();
+
+		// Calling `.sort()` encodes the search parameters, so we need to decode them again.
+		try {
+			urlObject.search = decodeURIComponent(urlObject.search);
+		} catch {}
 	}
 
 	if (options.removeTrailingSlash) {
 		urlObject.pathname = urlObject.pathname.replace(/\/$/, '');
+	}
+
+	// Remove an explicit port number, excluding a default port number, if applicable
+	if (options.removeExplicitPort && urlObject.port) {
+		urlObject.port = '';
 	}
 
 	const oldUrlString = urlString;
